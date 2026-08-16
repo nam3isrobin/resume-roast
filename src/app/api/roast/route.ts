@@ -73,7 +73,7 @@ ${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      model: 'llama-3.3-70b-versatile',
+      model: 'qwen/qwen3.6-27b',
       stream: true,
     });
 

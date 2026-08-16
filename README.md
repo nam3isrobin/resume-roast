@@ -2,7 +2,7 @@
 
 Get brutal, AI-powered feedback on your resume. Upload your PDF, drop in an optional job description, and prepare to be roasted.
 
-ResumeRoast is a Next.js application that leverages the power of Groq's high-speed inference (Llama-3.3-70B) to provide an elite, FAANG-level ATS (Applicant Tracking System) critique of your resume.
+ResumeRoast is a Next.js application that leverages the power of Groq's high-speed inference (Qwen3.6-27B) to provide an elite, FAANG-level ATS (Applicant Tracking System) critique of your resume.
 
 ## Features
 
@@ -16,7 +16,7 @@ ResumeRoast is a Next.js application that leverages the power of Groq's high-spe
 - **Framework**: Next.js 16 (App Router)
 - **Language**: TypeScript
 - **Styling**: Vanilla CSS Modules
-- **AI/LLM**: Groq API (`llama-3.3-70b-versatile`)
+- **AI/LLM**: Groq API (`qwen/qwen3.6-27b`)
 - **PDF Extraction**: `pdf2json`
 - **Markdown Rendering**: `react-markdown`
 
