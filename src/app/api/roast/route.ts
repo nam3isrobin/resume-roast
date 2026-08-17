@@ -2,12 +2,20 @@ import { NextResponse } from 'next/server';
 import PDFParser from 'pdf2json';
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
-
 export async function POST(req: Request) {
   try {
+    if (!process.env.GROQ_API_KEY) {
+      console.error('GROQ_API_KEY is not set.');
+      return NextResponse.json(
+        { error: 'Server is misconfigured: missing API key.' },
+        { status: 500 }
+      );
+    }
+
+    const groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY,
+    });
+
     const formData = await req.formData();
     const pdfFile = formData.get('pdf') as File | null;
     const jobDescription = formData.get('jobDescription') as string | null;
@@ -20,16 +28,35 @@ export async function POST(req: Request) {
     const buffer = Buffer.from(arrayBuffer);
 
     // Extract text from PDF
-    const resumeText = await new Promise<string>((resolve, reject) => {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParser = new (PDFParser as any)(null, 1);
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      pdfParser.on('pdfParser_dataError', (errData: any) => reject(errData.parserError));
-      pdfParser.on('pdfParser_dataReady', () => {
-        resolve(pdfParser.getRawTextContent());
+    let resumeText: string;
+    try {
+      resumeText = await new Promise<string>((resolve, reject) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pdfParser = new (PDFParser as any)(null, 1);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        pdfParser.on('pdfParser_dataError', (errData: any) => {
+          const cause = errData?.parserError ?? errData;
+          reject(cause instanceof Error ? cause : new Error(String(cause)));
+        });
+        pdfParser.on('pdfParser_dataReady', () => {
+          resolve(pdfParser.getRawTextContent());
+        });
+        pdfParser.parseBuffer(buffer);
       });
-      pdfParser.parseBuffer(buffer);
-    });
+    } catch (parseError) {
+      console.error('Failed to parse PDF:', parseError);
+      return NextResponse.json(
+        { error: 'Failed to parse the PDF. Please make sure it is a valid, uncorrupted PDF file.' },
+        { status: 422 }
+      );
+    }
+
+    if (!resumeText.trim()) {
+      return NextResponse.json(
+        { error: 'No text could be extracted from the PDF. Scanned or image-only PDFs are not supported.' },
+        { status: 422 }
+      );
+    }
 
     const systemPrompt = `You are an elite, brutally honest tech recruiter and ATS expert.
 
@@ -87,10 +114,10 @@ ${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
               controller.enqueue(encoder.encode(content));
             }
           }
-        } catch (err) {
-          controller.error(err);
-        } finally {
           controller.close();
+        } catch (err) {
+          console.error('Error while streaming Groq response:', err);
+          controller.error(err);
         }
       },
     });
@@ -104,6 +131,12 @@ ${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
 
   } catch (error) {
     console.error('Error processing roast:', error);
+    if (error instanceof Groq.APIError) {
+      return NextResponse.json(
+        { error: `The AI service returned an error (${error.status ?? 'unknown'}). Please try again later.` },
+        { status: 502 }
+      );
+    }
     return NextResponse.json({ error: 'Internal server error.' }, { status: 500 });
   }
 }
