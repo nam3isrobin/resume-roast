@@ -2,22 +2,47 @@ import { NextResponse } from 'next/server';
 import PDFParser from 'pdf2json';
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+const MAX_PDF_SIZE_BYTES = 5 * 1024 * 1024;
+const MAX_JOB_DESCRIPTION_LENGTH = 20_000;
+const PDF_MAGIC_BYTES = Buffer.from('%PDF-');
 
 export async function POST(req: Request) {
   try {
-    const formData = await req.formData();
-    const pdfFile = formData.get('pdf') as File | null;
-    const jobDescription = formData.get('jobDescription') as string | null;
+    if (!process.env.GROQ_API_KEY) {
+      console.error('GROQ_API_KEY is not configured.');
+      return NextResponse.json({ error: 'Service is not configured.' }, { status: 503 });
+    }
 
-    if (!pdfFile) {
+    const groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY,
+    });
+
+    const formData = await req.formData();
+    const pdfFile = formData.get('pdf');
+    const jobDescriptionField = formData.get('jobDescription');
+
+    if (!(pdfFile instanceof File)) {
       return NextResponse.json({ error: 'PDF file is required.' }, { status: 400 });
+    }
+
+    if (pdfFile.size > MAX_PDF_SIZE_BYTES) {
+      return NextResponse.json({ error: 'PDF file must be 5MB or smaller.' }, { status: 413 });
+    }
+
+    const jobDescription = typeof jobDescriptionField === 'string' ? jobDescriptionField : null;
+    if (jobDescription && jobDescription.length > MAX_JOB_DESCRIPTION_LENGTH) {
+      return NextResponse.json(
+        { error: 'Job description must be 20,000 characters or fewer.' },
+        { status: 400 }
+      );
     }
 
     const arrayBuffer = await pdfFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    if (!buffer.subarray(0, PDF_MAGIC_BYTES.length).equals(PDF_MAGIC_BYTES)) {
+      return NextResponse.json({ error: 'Uploaded file is not a valid PDF.' }, { status: 400 });
+    }
 
     // Extract text from PDF
     const resumeText = await new Promise<string>((resolve, reject) => {
