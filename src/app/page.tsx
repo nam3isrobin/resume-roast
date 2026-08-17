@@ -86,7 +86,16 @@ export default function Home() {
       });
 
       if (!response.ok) {
-        throw new Error(`Error: ${response.status} ${response.statusText}`);
+        let message = `Error: ${response.status} ${response.statusText}`;
+        try {
+          const body = await response.json();
+          if (body?.error) {
+            message = body.error;
+          }
+        } catch {
+          // Response body was not JSON; fall back to the status message.
+        }
+        throw new Error(message);
       }
 
       const reader = response.body?.getReader();
