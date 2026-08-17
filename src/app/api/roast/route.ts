@@ -2,9 +2,16 @@ import { NextResponse } from 'next/server';
 import PDFParser from 'pdf2json';
 import Groq from 'groq-sdk';
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY,
-});
+let groq: Groq | null = null;
+
+function getGroqClient(): Groq {
+  if (!groq) {
+    groq = new Groq({
+      apiKey: process.env.GROQ_API_KEY,
+    });
+  }
+  return groq;
+}
 
 export async function POST(req: Request) {
   try {
@@ -68,7 +75,7 @@ ${resumeText}
 ${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
 
     // Stream the Groq response
-    const stream = await groq.chat.completions.create({
+    const stream = await getGroqClient().chat.completions.create({
       messages: [
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }

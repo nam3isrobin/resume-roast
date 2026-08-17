@@ -2,6 +2,7 @@
 
 import { useState, useRef, DragEvent, ChangeEvent } from "react";
 import ReactMarkdown from "react-markdown";
+import Icon from "./components/Icon";
 import styles from "./page.module.css";
 
 export default function Home() {
@@ -13,44 +14,32 @@ export default function Home() {
   const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleDragOver = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(true);
+  const acceptFile = (files: FileList | null) => {
+    if (!files || files.length === 0) {
+      return;
+    }
+    const candidate = files[0];
+    if (candidate.type === "application/pdf") {
+      setFile(candidate);
+      setError("");
+    } else {
+      setError("Please upload a PDF file.");
+    }
   };
 
-  const handleDragLeave = (e: DragEvent<HTMLDivElement>) => {
+  const handleDragEvent = (e: DragEvent<HTMLDivElement>, active: boolean) => {
     e.preventDefault();
     e.stopPropagation();
-    setIsDragActive(false);
+    setIsDragActive(active);
   };
 
   const handleDrop = (e: DragEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.stopPropagation();
-    setIsDragActive(false);
-
-    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
-      const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile.type === "application/pdf") {
-        setFile(droppedFile);
-        setError("");
-      } else {
-        setError("Please upload a PDF file.");
-      }
-    }
+    handleDragEvent(e, false);
+    acceptFile(e.dataTransfer.files);
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
-    if (e.target.files && e.target.files.length > 0) {
-      const selectedFile = e.target.files[0];
-      if (selectedFile.type === "application/pdf") {
-        setFile(selectedFile);
-        setError("");
-      } else {
-        setError("Please upload a PDF file.");
-      }
-    }
+    acceptFile(e.target.files);
   };
 
   const triggerFileInput = () => {
@@ -135,25 +124,15 @@ export default function Home() {
             {!file ? (
               <div
                 className={`${styles.dropzone} ${isDragActive ? styles.dropzoneActive : ""}`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
+                onDragOver={(e) => handleDragEvent(e, true)}
+                onDragLeave={(e) => handleDragEvent(e, false)}
                 onDrop={handleDrop}
                 onClick={triggerFileInput}
               >
-                <svg
+                <Icon
                   className={styles.uploadIcon}
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                  xmlns="http://www.w3.org/2000/svg"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
-                  />
-                </svg>
+                  d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"
+                />
                 <div className={styles.dropzoneText}>
                   Drag & Drop your resume here
                 </div>
@@ -168,20 +147,10 @@ export default function Home() {
               </div>
             ) : (
               <div className={styles.fileSelected}>
-                <svg
-                  width="24"
-                  height="24"
-                  fill="none"
-                  stroke="currentColor"
-                  viewBox="0 0 24 24"
-                >
-                  <path
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                    strokeWidth={2}
-                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-                  />
-                </svg>
+                <Icon
+                  size={24}
+                  d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                />
                 <span className={styles.fileSelectedName}>{file.name}</span>
                 <button
                   className={styles.removeFileBtn}
@@ -189,9 +158,7 @@ export default function Home() {
                   title="Remove file"
                   aria-label="Remove file"
                 >
-                  <svg width="20" height="20" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <Icon size={20} d="M6 18L18 6M6 6l12 12" />
                 </button>
               </div>
             )}
