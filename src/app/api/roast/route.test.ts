@@ -8,7 +8,24 @@ vi.mock('groq-sdk', () => ({
   },
 }));
 
-let parseBehavior: { error?: unknown; text?: string } = {};
+type PdfText = { x: number; y: number; R: { T: string }[] };
+type PdfData = { Pages: { Texts: PdfText[] }[] };
+
+function pdfDataFromLines(lines: string[]): PdfData {
+  return {
+    Pages: [
+      {
+        Texts: lines.map((line, i) => ({
+          x: 0,
+          y: i,
+          R: [{ T: encodeURIComponent(line) }],
+        })),
+      },
+    ],
+  };
+}
+
+let parseBehavior: { error?: unknown; pdfData?: PdfData } = {};
 
 vi.mock('pdf2json', () => ({
   default: class {
@@ -20,11 +37,8 @@ vi.mock('pdf2json', () => ({
       if (parseBehavior.error !== undefined) {
         this.handlers['pdfParser_dataError']?.({ parserError: parseBehavior.error });
       } else {
-        this.handlers['pdfParser_dataReady']?.({});
+        this.handlers['pdfParser_dataReady']?.(parseBehavior.pdfData ?? { Pages: [] });
       }
-    }
-    getRawTextContent() {
-      return parseBehavior.text ?? '';
     }
   },
 }));
@@ -56,7 +70,7 @@ function buildRequest(options: { pdf?: boolean; jobDescription?: string } = {}) 
 
 describe('POST /api/roast', () => {
   beforeEach(() => {
-    parseBehavior = { text: 'John Doe\nSenior Engineer at Acme' };
+    parseBehavior = { pdfData: pdfDataFromLines(['John Doe', 'Senior Engineer at Acme']) };
     createMock.mockReset();
     createMock.mockResolvedValue(groqStream(['The ', 'Roast']));
     vi.spyOn(console, 'error').mockImplementation(() => {});
@@ -108,14 +122,39 @@ describe('POST /api/roast', () => {
     await (await POST(buildRequest())).text();
 
     expect(createMock).toHaveBeenCalledTimes(1);
-    const { messages, model, stream, reasoning_format } = createMock.mock.calls[0][0];
+    const { messages, model, stream, reasoning_effort } = createMock.mock.calls[0][0];
     expect(model).toBe('qwen/qwen3.6-27b');
     expect(stream).toBe(true);
-    expect(reasoning_format).toBe('hidden');
+    expect(reasoning_effort).toBe('none');
     expect(messages[0].role).toBe('system');
+    expect(messages[0].content).toContain(`today's date is ${new Date().toISOString().slice(0, 10)}`);
+    expect(messages[0].content).toContain('extraction artifacts');
     expect(messages[1].role).toBe('user');
     expect(messages[1].content).toContain('John Doe\nSenior Engineer at Acme');
     expect(messages[1].content).not.toContain('Job Description:');
+    expect(messages[1].content).toContain('No Job Description was provided');
+  });
+
+  it('reconstructs reading order from PDF text positions', async () => {
+    parseBehavior = {
+      pdfData: {
+        Pages: [
+          {
+            Texts: [
+              { x: 0, y: 2, R: [{ T: encodeURIComponent('Bottom line') }] },
+              { x: 1, y: 0, R: [{ T: encodeURIComponent(' Doe') }] },
+              { x: 0, y: 0, R: [{ T: encodeURIComponent('John') }] },
+              { x: 0, y: 1, R: [{ T: encodeURIComponent('Middle line') }] },
+            ],
+          },
+        ],
+      },
+    };
+
+    await (await POST(buildRequest())).text();
+
+    const { messages } = createMock.mock.calls[0][0];
+    expect(messages[1].content).toContain('John Doe\nMiddle line\nBottom line');
   });
 
   it('includes the job description in the prompt when provided', async () => {
@@ -123,5 +162,6 @@ describe('POST /api/roast', () => {
 
     const { messages } = createMock.mock.calls[0][0];
     expect(messages[1].content).toContain('Job Description:\nStaff Engineer, Kubernetes');
+    expect(messages[1].content).not.toContain('No Job Description was provided');
   });
 });
