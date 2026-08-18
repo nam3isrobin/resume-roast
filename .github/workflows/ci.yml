@@ -12,4 +12,8 @@ jobs:
       - run: npm run lint --if-present
       - run: npm test --if-present
       - run: npm run build --if-present
+        env:
+          # Dummy key so `next build` can instantiate the Groq client during
+          # page-data collection; never used to make API calls.
+          GROQ_API_KEY: ci-build-placeholder
       - run: npm audit --audit-level=high
