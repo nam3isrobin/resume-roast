@@ -9,6 +9,7 @@ ResumeRoast is a Next.js application that leverages the power of Groq's high-spe
 - **Brutally Honest AI**: Uses an advanced 6-layer prompt template to ensure the critique is actionable, highly technical, and strictly free of fluff.
 - **Native PDF Parsing**: Extracts text directly from your resume on the server using `pdf2json`, maintaining absolute privacy with zero disk storage.
 - **Real-time Streaming**: Watch the AI tear your resume apart (and tell you how to rebuild it) in real-time as the markdown streams back to the UI.
+- **Guardrails**: Uploads are restricted to `application/pdf` files of at most 5MB, and the roast endpoint is rate limited per client IP (5 requests/minute) to protect the Groq API budget.
 - **Premium Glassmorphism UI**: Built with pure Vanilla CSS—no utility frameworks—featuring a vibrant dark-mode aesthetic with custom micro-animations and drop zones.
 
 ## Tech Stack
@@ -44,14 +45,21 @@ ResumeRoast is a Next.js application that leverages the power of Groq's high-spe
    npm run dev
    ```
 
-5. **Roast It**:
+5. **Run the tests**:
+   ```bash
+   npm test
+   ```
+
+6. **Roast It**:
    Open [http://localhost:3000](http://localhost:3000) in your browser. Drag and drop your PDF resume, paste an optional job description, and hit "Roast My Resume".
 
 ## Project Architecture
 
 - **`src/app/page.tsx`**: The main frontend UI, managing state, drag-and-drop file uploads, and streaming the Groq API response.
 - **`src/app/globals.css` & `src/app/page.module.css`**: The core design system and component styling, enforcing the glassmorphic aesthetic.
-- **`src/app/api/roast/route.ts`**: The Next.js API route that handles the multipart form data, parses the PDF buffer, constructs the 6-layer AI prompt, and orchestrates the Groq streaming completion.
+- **`src/app/api/roast/route.ts`**: The Next.js API route that validates and handles the multipart form data, parses the PDF buffer, constructs the 6-layer AI prompt, and orchestrates the Groq streaming completion.
+- **`src/lib/upload.ts` & `src/lib/rate-limit.ts`**: Upload validation (MIME type, size) and the in-memory per-IP rate limiter used by the API route.
+- **`tests/`**: Vitest suites covering upload validation, rate limiting, and the API route's rejection paths.
 
 ## License
 

@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import PDFParser from 'pdf2json';
 import Groq from 'groq-sdk';
+import { validatePdfUpload } from '@/lib/upload';
+import { checkRateLimit, getClientIp } from '@/lib/rate-limit';
 
 const groq = new Groq({
   apiKey: process.env.GROQ_API_KEY,
@@ -8,12 +10,25 @@ const groq = new Groq({
 
 export async function POST(req: Request) {
   try {
+    const rateLimit = checkRateLimit(getClientIp(req));
+    if (!rateLimit.allowed) {
+      return NextResponse.json(
+        { error: 'Too many roasts. Slow down and try again shortly.' },
+        { status: 429, headers: { 'Retry-After': String(rateLimit.retryAfterSeconds) } }
+      );
+    }
+
     const formData = await req.formData();
     const pdfFile = formData.get('pdf') as File | null;
     const jobDescription = formData.get('jobDescription') as string | null;
 
     if (!pdfFile) {
       return NextResponse.json({ error: 'PDF file is required.' }, { status: 400 });
+    }
+
+    const validation = validatePdfUpload(pdfFile);
+    if (!validation.ok) {
+      return NextResponse.json({ error: validation.error }, { status: validation.status });
     }
 
     const arrayBuffer = await pdfFile.arrayBuffer();

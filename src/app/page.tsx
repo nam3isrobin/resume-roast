@@ -3,6 +3,7 @@
 import { useState, useRef, DragEvent, ChangeEvent } from "react";
 import ReactMarkdown from "react-markdown";
 import styles from "./page.module.css";
+import { validatePdfUpload } from "@/lib/upload";
 
 export default function Home() {
   const [file, setFile] = useState<File | null>(null);
@@ -32,11 +33,12 @@ export default function Home() {
 
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const droppedFile = e.dataTransfer.files[0];
-      if (droppedFile.type === "application/pdf") {
+      const validation = validatePdfUpload(droppedFile);
+      if (validation.ok) {
         setFile(droppedFile);
         setError("");
       } else {
-        setError("Please upload a PDF file.");
+        setError(validation.error);
       }
     }
   };
@@ -44,11 +46,12 @@ export default function Home() {
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files && e.target.files.length > 0) {
       const selectedFile = e.target.files[0];
-      if (selectedFile.type === "application/pdf") {
+      const validation = validatePdfUpload(selectedFile);
+      if (validation.ok) {
         setFile(selectedFile);
         setError("");
       } else {
-        setError("Please upload a PDF file.");
+        setError(validation.error);
       }
     }
   };
