@@ -106,9 +106,9 @@ ${jobDescription ? `Job Description:\n${jobDescription}` : ''}
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      model: 'qwen/qwen3.6-27b',
+      model: 'openai/gpt-oss-120b',
       stream: true,
-      reasoning_effort: 'none',
+      reasoning_effort: 'low',
       max_completion_tokens: 4096,
     });
 

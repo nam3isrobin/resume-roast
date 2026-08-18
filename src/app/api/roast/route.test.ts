@@ -123,9 +123,9 @@ describe('POST /api/roast', () => {
 
     expect(createMock).toHaveBeenCalledTimes(1);
     const { messages, model, stream, reasoning_effort } = createMock.mock.calls[0][0];
-    expect(model).toBe('qwen/qwen3.6-27b');
+    expect(model).toBe('openai/gpt-oss-120b');
     expect(stream).toBe(true);
-    expect(reasoning_effort).toBe('none');
+    expect(reasoning_effort).toBe('low');
     expect(messages[0].role).toBe('system');
     expect(messages[0].content).toContain(`today's date is ${new Date().toISOString().slice(0, 10)}`);
     expect(messages[0].content).toContain('extraction artifacts');
