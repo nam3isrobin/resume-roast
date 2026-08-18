@@ -75,6 +75,8 @@ ${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
       ],
       model: 'qwen/qwen3.6-27b',
       stream: true,
+      reasoning_format: 'hidden',
+      max_completion_tokens: 4096,
     });
 
     const encoder = new TextEncoder();

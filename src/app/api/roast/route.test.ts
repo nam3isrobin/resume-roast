@@ -108,9 +108,10 @@ describe('POST /api/roast', () => {
     await (await POST(buildRequest())).text();
 
     expect(createMock).toHaveBeenCalledTimes(1);
-    const { messages, model, stream } = createMock.mock.calls[0][0];
+    const { messages, model, stream, reasoning_format } = createMock.mock.calls[0][0];
     expect(model).toBe('qwen/qwen3.6-27b');
     expect(stream).toBe(true);
+    expect(reasoning_format).toBe('hidden');
     expect(messages[0].role).toBe('system');
     expect(messages[1].role).toBe('user');
     expect(messages[1].content).toContain('John Doe\nSenior Engineer at Acme');
