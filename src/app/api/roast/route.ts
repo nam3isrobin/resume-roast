@@ -19,14 +19,42 @@ export async function POST(req: Request) {
     const arrayBuffer = await pdfFile.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
-    // Extract text from PDF
+    // Extract text from PDF in reading order (top-to-bottom, left-to-right).
+    // pdf2json's getRawTextContent returns text runs in PDF stream order,
+    // which can be arbitrary (e.g. bottom-up), so we sort by position instead.
     const resumeText = await new Promise<string>((resolve, reject) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const pdfParser = new (PDFParser as any)(null, 1);
+      const pdfParser = new (PDFParser as any)();
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       pdfParser.on('pdfParser_dataError', (errData: any) => reject(errData.parserError));
-      pdfParser.on('pdfParser_dataReady', () => {
-        resolve(pdfParser.getRawTextContent());
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      pdfParser.on('pdfParser_dataReady', (pdfData: any) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const pages: any[] = pdfData?.Pages ?? [];
+        const text = pages
+          .map((page) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const texts: any[] = [...(page.Texts ?? [])].sort(
+              (a, b) => a.y - b.y || a.x - b.x
+            );
+            const lines: string[] = [];
+            let lastY = -Infinity;
+            for (const t of texts) {
+              const run = (t.R ?? [])
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                .map((r: any) => decodeURIComponent(r.T))
+                .join('');
+              if (Math.abs(t.y - lastY) > 0.3) {
+                lines.push(run);
+                lastY = t.y;
+              } else {
+                lines[lines.length - 1] += run;
+              }
+            }
+            return lines.join('\n');
+          })
+          .join('\n\n');
+        resolve(text);
       });
       pdfParser.parseBuffer(buffer);
     });
@@ -51,21 +79,26 @@ Focus on:
 - Overall match for the target role (if JD provided)
 
 [Verification]
-Ensure every critique points to a specific part of the resume. Do not make generic statements.
+Ensure every critique points to a specific part of the resume — quote or name the exact section, project, or bullet you are criticizing. Do not make generic statements.
+Do not invent deficiencies: if the resume already provides a concrete metric, technology, or date, do not claim it is missing.
+Your training data has a cutoff; today's date is ${new Date().toISOString().slice(0, 10)} and newer tool, framework, and model versions exist that you have never heard of. NEVER claim a version number, tool, or model on the resume does not exist or was invented. Treat every resume date on or before ${new Date().toISOString().slice(0, 10)} as a valid past date — never call such dates "future", "impossible", or a red flag. If something seems unverifiable, say it should be verifiable (e.g. via a link), not that it is fake.
 
 [Context]
 The user is providing their resume text (extracted from a PDF) and optionally a job description.
+The text was machine-extracted, so line breaks, spacing, and word splits may be extraction artifacts — do not critique visual layout, line wrapping, or section ordering based on the extracted text alone. Judge the content, not the extraction.
 
 [Format]
 1. **The Brutal Truth**: A one-paragraph summary of the resume's overall vibe and effectiveness.
 2. **The Roast**: 3-5 bullet points tearing apart specific weaknesses.
 3. **The Redemption**: 3-5 actionable steps to fix the resume.
-4. **JD Match** (only if Job Description is provided): A harsh assessment of how well the resume matches the JD.`;
+4. **JD Match** (ONLY if a Job Description is provided): A harsh assessment of how well the resume matches the JD. If no Job Description is provided, end your response after The Redemption — do not output a JD Match section or any note about a missing JD.`;
 
     const userPrompt = `Resume Text:
 ${resumeText}
 
-${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
+${jobDescription ? `Job Description:\n${jobDescription}` : ''}
+
+(Reminder: today is ${new Date().toISOString().slice(0, 10)}. Tool/framework/model versions newer than your training data exist — never claim a version or tool on the resume does not exist, and never call resume dates future or impossible.${jobDescription ? '' : ' No Job Description was provided: end after The Redemption with no JD Match section.'})`;
 
     // Stream the Groq response
     const stream = await groq.chat.completions.create({
@@ -73,9 +106,9 @@ ${jobDescription ? `Job Description:\n${jobDescription}` : ''}`;
         { role: 'system', content: systemPrompt },
         { role: 'user', content: userPrompt }
       ],
-      model: 'qwen/qwen3.6-27b',
+      model: 'openai/gpt-oss-120b',
       stream: true,
-      reasoning_format: 'hidden',
+      reasoning_effort: 'low',
       max_completion_tokens: 4096,
     });
 
